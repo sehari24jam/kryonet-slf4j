@@ -9,11 +9,11 @@
 
     <groupId>net.lizalab</groupId>
     <artifactId>kryonet-slf4j</artifactId>
-    <version>2.22.0-RC1</version>
+    <version>2.22.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>KryoNet-slf4j</name>
-    <description>Fork of Esoteric Software's Kryo built by Nathan Sweet that replaces Minlog with slf4j as the logging facade.</description>
+    <description>Fork of Esoteric Software's KryoNet built by Nathan Sweet that replaces Minlog with slf4j as the logging facade and removes hard dependency on jsonbeans.</description>
     <url>https://github.com/hpadmanabhan/kryonet-slf4j</url>
 
     <licenses>
@@ -41,6 +41,17 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
+
+  <distributionManagement>
+    <snapshotRepository>
+      <id>ossrh</id>
+      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+    </snapshotRepository>
+    <repository>
+      <id>ossrh</id>
+      <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+    </repository>
+  </distributionManagement>
 
     <build>
         <pluginManagement>

@@ -8,3 +8,12 @@ KryoNet-slf4j also decouples the explicit dependency on jsonbeans letting users 
 
 KryoNet-slf4j is built off v2.22.0-RC1 of KryoNet and accordingly tracks the version. Please refer to the [KryoNet](https://github.com/EsotericSoftware/kryonet) project page for detailed documentation on the KryoNet API and its usage.
 
+You can obtain the release binaries from the releases page above or alternately if you use Maven you can get it directly from Maven Central using the following dependency configurations:
+```xml
+    <dependency>
+      <groupId>net.lizalab</groupId>
+      <artifactId>kryonet-slf4j</artifactId>
+      <version>2.22.0</version>
+      <scope>compile</scope>
+    </dependency>
+```
