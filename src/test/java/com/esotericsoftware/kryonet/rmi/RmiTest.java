@@ -87,6 +87,9 @@ public class RmiTest extends KryoNetTestCase {
 		client.connect(5000, host, tcpPort, udpPort);
 
 		waitForThreads();
+		
+		server.stop();
+		server.close();
 	}
 
 	public void testMany () throws IOException {
