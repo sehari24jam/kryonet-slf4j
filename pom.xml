@@ -33,8 +33,8 @@
 
     <scm>
         <url>https://github.com/hpadmanabhan/kryonet-slf4j</url>
-        <connection>scm:git:https://github.com/hpadmanabhan/kryonet-slf4j.git</connection>
-        <developerConnection>scm:git:https://github.com/hpadmanabhan/kryonet-slf4j.git</developerConnection>
+        <connection>scm:git:git@github.com:hpadmanabhan/kryonet-slf4j.git</connection>
+		<developerConnection>scm:git:git@github.com:hpadmanabhan/kryonet-slf4j.git</developerConnection>
         <tag>HEAD</tag>
     </scm>
 
