@@ -21,7 +21,6 @@ package com.esotericsoftware.kryonet;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
 import java.nio.channels.CancelledKeyException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -32,17 +31,20 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.util.IntMap;
 import com.esotericsoftware.kryonet.FrameworkMessage.DiscoverHost;
 import com.esotericsoftware.kryonet.FrameworkMessage.RegisterTCP;
 import com.esotericsoftware.kryonet.FrameworkMessage.RegisterUDP;
 
-import static com.esotericsoftware.minlog.Log.*;
-
 /** Manages TCP and optionally UDP connections from many {@link Client Clients}.
  * @author Nathan Sweet <misc@n4te.com> */
 public class Server implements EndPoint {
+	private static final Logger LOGGER = LoggerFactory.getLogger(Server.class);
+	
 	private final Serialization serialization;
 	private final int writeBufferSize, objectBufferSize;
 	private final Selector selector;
@@ -50,7 +52,7 @@ public class Server implements EndPoint {
 	private ServerSocketChannel serverChannel;
 	private UdpConnection udp;
 	private Connection[] connections = {};
-	private IntMap<Connection> pendingConnections = new IntMap();
+	private IntMap<Connection> pendingConnections = new IntMap<Connection>();
 	Listener[] listeners = {};
 	private Object listenerLock = new Object();
 	private int nextConnectionID = 1;
@@ -150,6 +152,8 @@ public class Server implements EndPoint {
 
 	/** @param udpPort May be null. */
 	public void bind (InetSocketAddress tcpPort, InetSocketAddress udpPort) throws IOException {
+		final String methodName = "bind : ";
+		
 		close();
 		synchronized (updateLock) {
 			selector.wakeup();
@@ -158,25 +162,27 @@ public class Server implements EndPoint {
 				serverChannel.socket().bind(tcpPort);
 				serverChannel.configureBlocking(false);
 				serverChannel.register(selector, SelectionKey.OP_ACCEPT);
-				if (DEBUG) debug("kryonet", "Accepting connections on port: " + tcpPort + "/TCP");
+				LOGGER.debug("{} Accepting connections on port: {}/TCP", methodName, tcpPort);
 
 				if (udpPort != null) {
 					udp = new UdpConnection(serialization, objectBufferSize);
 					udp.bind(selector, udpPort);
-					if (DEBUG) debug("kryonet", "Accepting connections on port: " + udpPort + "/UDP");
+					LOGGER.debug("{} Accepting connections on port: {}/UDP", methodName, udpPort);
 				}
 			} catch (IOException ex) {
 				close();
 				throw ex;
 			}
 		}
-		if (INFO) info("kryonet", "Server opened.");
+		LOGGER.info("{} Server opened.", methodName);
 	}
 
 	/** Accepts any new connections and reads or writes any pending data for the current connections.
 	 * @param timeout Wait for up to the specified milliseconds for a connection to be ready to process. May be zero to return
 	 *           immediately if there are no connections to process. */
 	public void update (int timeout) throws IOException {
+		final String methodName = "update : ";
+		
 		updateThread = Thread.currentThread();
 		synchronized (updateLock) { // Blocks to avoid a select while the selector is used to bind the server connection.
 		}
@@ -222,25 +228,25 @@ public class Server implements EndPoint {
 									while (true) {
 										Object object = fromConnection.tcp.readObject(fromConnection);
 										if (object == null) break;
-										if (DEBUG) {
+										if (LOGGER.isDebugEnabled()) {
 											String objectString = object == null ? "null" : object.getClass().getSimpleName();
 											if (!(object instanceof FrameworkMessage)) {
-												debug("kryonet", fromConnection + " received TCP: " + objectString);
-											} else if (TRACE) {
-												trace("kryonet", fromConnection + " received TCP: " + objectString);
+												LOGGER.debug("{}{} received TCP: {}", methodName, fromConnection, objectString);
+											} else if (LOGGER.isTraceEnabled()) {
+												LOGGER.trace("{}{} received TCP: {}", methodName, fromConnection, objectString);
 											}
 										}
 										fromConnection.notifyReceived(object);
 									}
 								} catch (IOException ex) {
-									if (TRACE) {
-										trace("kryonet", "Unable to read TCP from: " + fromConnection, ex);
-									} else if (DEBUG) {
-										debug("kryonet", fromConnection + " update: " + ex.getMessage());
+									if (LOGGER.isTraceEnabled()) {
+										LOGGER.trace("Unable to read TCP from: " + fromConnection, ex);
+									} else if (LOGGER.isDebugEnabled()) {
+										LOGGER.debug("{}{} update: {}", methodName, fromConnection, ex.getMessage());
 									}
 									fromConnection.close();
 								} catch (KryoNetException ex) {
-									if (ERROR) error("kryonet", "Error reading TCP from connection: " + fromConnection, ex);
+									LOGGER.error("Error reading TCP from connection: " + fromConnection, ex);
 									fromConnection.close();
 								}
 							}
@@ -248,10 +254,10 @@ public class Server implements EndPoint {
 								try {
 									fromConnection.tcp.writeOperation();
 								} catch (IOException ex) {
-									if (TRACE) {
-										trace("kryonet", "Unable to write TCP to connection: " + fromConnection, ex);
-									} else if (DEBUG) {
-										debug("kryonet", fromConnection + " update: " + ex.getMessage());
+									if (LOGGER.isTraceEnabled()) {
+										LOGGER.trace("Unable to write TCP to connection: " + fromConnection, ex);
+									} else if (LOGGER.isDebugEnabled()) {
+										LOGGER.debug("{}{} update: {}", methodName, fromConnection, ex.getMessage());
 									}
 									fromConnection.close();
 								}
@@ -266,7 +272,7 @@ public class Server implements EndPoint {
 								SocketChannel socketChannel = serverChannel.accept();
 								if (socketChannel != null) acceptOperation(socketChannel);
 							} catch (IOException ex) {
-								if (DEBUG) debug("kryonet", "Unable to accept new connection.", ex);
+								LOGGER.debug("Unable to accept new connection.", ex);
 							}
 							continue;
 						}
@@ -280,7 +286,7 @@ public class Server implements EndPoint {
 						try {
 							fromAddress = udp.readFromAddress();
 						} catch (IOException ex) {
-							if (WARN) warn("kryonet", "Error reading UDP data.", ex);
+							LOGGER.warn("Error reading UDP data.", ex);
 							continue;
 						}
 						if (fromAddress == null) continue;
@@ -298,12 +304,10 @@ public class Server implements EndPoint {
 						try {
 							object = udp.readObject(fromConnection);
 						} catch (KryoNetException ex) {
-							if (WARN) {
-								if (fromConnection != null) {
-									if (ERROR) error("kryonet", "Error reading UDP from connection: " + fromConnection, ex);
-								} else
-									warn("kryonet", "Error reading UDP from unregistered address: " + fromAddress, ex);
-							}
+							if (fromConnection != null) {
+								LOGGER.error("Error reading UDP from connection: " + fromConnection, ex);
+							} else
+								LOGGER.warn("Error reading UDP from unregistered address: " + fromAddress, ex);
 							continue;
 						}
 
@@ -317,39 +321,39 @@ public class Server implements EndPoint {
 									connection.udpRemoteAddress = fromAddress;
 									addConnection(connection);
 									connection.sendTCP(new RegisterUDP());
-									if (DEBUG)
-										debug("kryonet", "Port " + udp.datagramChannel.socket().getLocalPort() + "/UDP connected to: "
-											+ fromAddress);
+									LOGGER.debug("{} Port {}/UDP connected to: {}", methodName, udp.datagramChannel.socket().getLocalPort(),
+											fromAddress);
 									connection.notifyConnected();
 									continue;
 								}
-								if (DEBUG)
-									debug("kryonet", "Ignoring incoming RegisterUDP with invalid connection ID: " + fromConnectionID);
+								LOGGER.debug("{} Ignoring incoming RegisterUDP with invalid connection ID: {}", methodName, fromConnectionID);
 								continue;
 							}
 							if (object instanceof DiscoverHost) {
 								try {
 									boolean responseSent = discoveryHandler.onDiscoverHost(udp, fromAddress, serialization);
-									if (DEBUG && responseSent) debug("kryonet", "Responded to host discovery from: " + fromAddress);
+									if (responseSent) {
+										LOGGER.debug("{} Responded to host discovery from: {}", methodName, fromAddress);
+									}
 								} catch (IOException ex) {
-									if (WARN) warn("kryonet", "Error replying to host discovery from: " + fromAddress, ex);
+									LOGGER.warn("Error replying to host discovery from: " + fromAddress, ex);
 								}
 								continue;
 							}
 						}
 
 						if (fromConnection != null) {
-							if (DEBUG) {
+							if (LOGGER.isDebugEnabled()) {
 								String objectString = object == null ? "null" : object.getClass().getSimpleName();
 								if (object instanceof FrameworkMessage) {
-									if (TRACE) trace("kryonet", fromConnection + " received UDP: " + objectString);
+									LOGGER.trace("{}{} received UDP: {}", methodName, fromConnection, objectString);
 								} else
-									debug("kryonet", fromConnection + " received UDP: " + objectString);
+									LOGGER.debug("{}{} received UDP: {}", methodName, fromConnection, objectString);
 							}
 							fromConnection.notifyReceived(object);
 							continue;
 						}
-						if (DEBUG) debug("kryonet", "Ignoring UDP from unregistered address: " + fromAddress);
+						LOGGER.debug("{} Ignoring UDP from unregistered address: {}", methodName, fromAddress);
 					} catch (CancelledKeyException ex) {
 						if (fromConnection != null)
 							fromConnection.close();
@@ -364,7 +368,7 @@ public class Server implements EndPoint {
 		for (int i = 0, n = connections.length; i < n; i++) {
 			Connection connection = connections[i];
 			if (connection.tcp.isTimedOut(time)) {
-				if (DEBUG) debug("kryonet", connection + " timed out.");
+				LOGGER.debug("{}{} timed out.", methodName, connection);
 				connection.close();
 			} else {
 				if (connection.tcp.needsKeepAlive(time)) connection.sendTCP(FrameworkMessage.keepAlive);
@@ -383,17 +387,19 @@ public class Server implements EndPoint {
 	}
 
 	public void run () {
-		if (TRACE) trace("kryonet", "Server thread started.");
+		final String methodName = "run : ";
+		
+		LOGGER.trace("{} Server thread started.", methodName);
 		shutdown = false;
 		while (!shutdown) {
 			try {
 				update(250);
 			} catch (IOException ex) {
-				if (ERROR) error("kryonet", "Error updating server connections.", ex);
+				LOGGER.error("Error updating server connections.", ex);
 				close();
 			}
 		}
-		if (TRACE) trace("kryonet", "Server thread stopped.");
+		LOGGER.trace("{} Server thread stopped.", methodName);
 	}
 
 	public void start () {
@@ -403,7 +409,7 @@ public class Server implements EndPoint {
 	public void stop () {
 		if (shutdown) return;
 		close();
-		if (TRACE) trace("kryonet", "Server thread stopping.");
+		LOGGER.trace("stop : Server thread stopping.");
 		shutdown = true;
 	}
 
@@ -435,7 +441,7 @@ public class Server implements EndPoint {
 			if (udp == null) connection.notifyConnected();
 		} catch (IOException ex) {
 			connection.close();
-			if (DEBUG) debug("kryonet", "Unable to accept TCP connection.", ex);
+			LOGGER.debug("acceptOperation : Unable to accept TCP connection.", ex);
 		}
 	}
 
@@ -453,7 +459,7 @@ public class Server implements EndPoint {
 	}
 
 	void removeConnection (Connection connection) {
-		ArrayList<Connection> temp = new ArrayList(Arrays.asList(connections));
+		ArrayList<Connection> temp = new ArrayList<Connection>(Arrays.asList(connections));
 		temp.remove(connection);
 		connections = temp.toArray(new Connection[temp.size()]);
 
@@ -528,7 +534,7 @@ public class Server implements EndPoint {
 			System.arraycopy(listeners, 0, newListeners, 1, n);
 			this.listeners = newListeners;
 		}
-		if (TRACE) trace("kryonet", "Server listener added: " + listener.getClass().getName());
+		LOGGER.trace("addListener : Server listener added: {}", listener.getClass().getName());
 	}
 
 	public void removeListener (Listener listener) {
@@ -545,13 +551,17 @@ public class Server implements EndPoint {
 			}
 			this.listeners = newListeners;
 		}
-		if (TRACE) trace("kryonet", "Server listener removed: " + listener.getClass().getName());
+		LOGGER.trace("removeListener : Server listener removed: {}" + listener.getClass().getName());
 	}
 
 	/** Closes all open connections and the server port(s). */
 	public void close () {
+		final String methodName = "close : ";
+		
 		Connection[] connections = this.connections;
-		if (INFO && connections.length > 0) info("kryonet", "Closing server connections...");
+		if (connections.length > 0) {
+			LOGGER.info("{} Closing server connections...", methodName);
+		}
 		for (int i = 0, n = connections.length; i < n; i++)
 			connections[i].close();
 		connections = new Connection[0];
@@ -560,9 +570,9 @@ public class Server implements EndPoint {
 		if (serverChannel != null) {
 			try {
 				serverChannel.close();
-				if (INFO) info("kryonet", "Server closed.");
+				LOGGER.info("{} Server closed.", methodName);
 			} catch (IOException ex) {
-				if (DEBUG) debug("kryonet", "Unable to close server.", ex);
+				LOGGER.error("Unable to close server.", ex);
 			}
 			this.serverChannel = null;
 		}

@@ -25,12 +25,15 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 
-import static com.esotericsoftware.minlog.Log.*;
-
 public class DiscoverHostTest extends KryoNetTestCase {
+	
+	private static final Logger LOGGER = LoggerFactory.getLogger(DiscoverHostTest.class);
 
 	public void testBroadcast() throws IOException {
 		// This server exists solely to reply to Client#discoverHost.
@@ -104,14 +107,16 @@ public class DiscoverHostTest extends KryoNetTestCase {
 
 			@Override
 			public void onDiscoveredHost(DatagramPacket datagramPacket, Kryo kryo) {
+				final String methodName = "onDiscoveredHost : ";
+				
 				if (input != null) {
 					DiscoveryResponsePacket packet;
 					packet = (DiscoveryResponsePacket) kryo.readClassAndObject(input);
-					info("test", "packet.id = " + packet.id);
-					info("test", "packet.gameName = " + packet.gameName);
-					info("test", "packet.playerName = " + packet.playerName);
-					info("test", "datagramPacket.getAddress() = " + datagramPacket.getAddress());
-					info("test", "datagramPacket.getPort() = " + datagramPacket.getPort());
+					LOGGER.info("{} packet.id = {}", methodName, packet.id);
+					LOGGER.info("{} packet.gameName = {}", methodName, packet.gameName);
+					LOGGER.info("{} packet.playerName = {}", methodName, packet.playerName);
+					LOGGER.info("{} datagramPacket.getAddress() = {}", methodName, datagramPacket.getAddress());
+					LOGGER.info("{} datagramPacket.getPort() = {}", methodName, datagramPacket.getPort());
 					assertEquals(42, packet.id);
 					assertEquals("gameName", packet.gameName);
 					assertEquals("playerName", packet.playerName);

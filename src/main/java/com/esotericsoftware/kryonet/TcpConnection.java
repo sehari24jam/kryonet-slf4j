@@ -28,10 +28,13 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 
-import static com.esotericsoftware.minlog.Log.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** @author Nathan Sweet <misc@n4te.com> */
 class TcpConnection {
+	private static final Logger LOGGER = LoggerFactory.getLogger(TcpConnection.class);
+	
 	static private final int IPTOS_LOWDELAY = 0x10;
 
 	SocketChannel socketChannel;
@@ -67,9 +70,9 @@ class TcpConnection {
 
 			selectionKey = socketChannel.register(selector, SelectionKey.OP_READ);
 
-			if (DEBUG) {
-				debug("kryonet", "Port " + socketChannel.socket().getLocalPort() + "/TCP connected to: "
-					+ socketChannel.socket().getRemoteSocketAddress());
+			if (LOGGER.isDebugEnabled()) {
+				LOGGER.debug("accept : Port {}/TCP connected to: {}", socketChannel.socket().getLocalPort(),
+					socketChannel.socket().getRemoteSocketAddress());
 			}
 
 			lastReadTime = lastWriteTime = System.currentTimeMillis();
@@ -99,9 +102,9 @@ class TcpConnection {
 			selectionKey = socketChannel.register(selector, SelectionKey.OP_READ);
 			selectionKey.attach(this);
 
-			if (DEBUG) {
-				debug("kryonet", "Port " + socketChannel.socket().getLocalPort() + "/TCP connected to: "
-					+ socketChannel.socket().getRemoteSocketAddress());
+			if (LOGGER.isDebugEnabled()) {
+				LOGGER.debug("connect : Port {}/TCP connected to: {}", socketChannel.socket().getLocalPort(),
+					socketChannel.socket().getRemoteSocketAddress());
 			}
 
 			lastReadTime = lastWriteTime = System.currentTimeMillis();
@@ -197,6 +200,8 @@ class TcpConnection {
 
 	/** This method is thread safe. */
 	public int send (Connection connection, Object object) throws IOException {
+		final String methodName = "send : ";
+		
 		SocketChannel socketChannel = this.socketChannel;
 		if (socketChannel == null) throw new SocketException("Connection is closed.");
 		synchronized (writeLock) {
@@ -227,12 +232,12 @@ class TcpConnection {
 				selectionKey.selector().wakeup();
 			}
 
-			if (DEBUG || TRACE) {
+			if (LOGGER.isDebugEnabled() || LOGGER.isTraceEnabled()) {
 				float percentage = writeBuffer.position() / (float)writeBuffer.capacity();
-				if (DEBUG && percentage > 0.75f)
-					debug("kryonet", connection + " TCP write buffer is approaching capacity: " + percentage + "%");
-				else if (TRACE && percentage > 0.25f)
-					trace("kryonet", connection + " TCP write buffer utilization: " + percentage + "%");
+				if (LOGGER.isDebugEnabled() && percentage > 0.75f)
+					LOGGER.debug("{}{} TCP write buffer is approaching capacity: {}%", methodName, connection, percentage);
+				else if (LOGGER.isTraceEnabled() && percentage > 0.25f)
+					LOGGER.trace("{}{} TCP write buffer utilization: {}", methodName, connection, percentage);
 			}
 
 			lastWriteTime = System.currentTimeMillis();
@@ -248,7 +253,7 @@ class TcpConnection {
 				if (selectionKey != null) selectionKey.selector().wakeup();
 			}
 		} catch (IOException ex) {
-			if (DEBUG) debug("kryonet", "Unable to close TCP connection.", ex);
+			LOGGER.debug("close : Unable to close TCP connection.", ex);
 		}
 	}
 

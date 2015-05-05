@@ -28,10 +28,13 @@ import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 
-import static com.esotericsoftware.minlog.Log.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** @author Nathan Sweet <misc@n4te.com> */
 class UdpConnection {
+	private static final Logger LOGGER = LoggerFactory.getLogger(UdpConnection.class);
+	
 	InetSocketAddress connectedAddress;
 	DatagramChannel datagramChannel;
 	int keepAliveMillis = 19000;
@@ -145,7 +148,7 @@ class UdpConnection {
 				if (selectionKey != null) selectionKey.selector().wakeup();
 			}
 		} catch (IOException ex) {
-			if (DEBUG) debug("kryonet", "Unable to close UDP connection.", ex);
+			LOGGER.debug("close : Unable to close UDP connection.", ex);
 		}
 	}
 

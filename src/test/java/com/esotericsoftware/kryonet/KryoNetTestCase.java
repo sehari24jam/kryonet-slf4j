@@ -26,28 +26,16 @@ import java.util.TimerTask;
 
 import junit.framework.TestCase;
 
-import com.esotericsoftware.minlog.Log;
-import com.esotericsoftware.minlog.Log.Logger;
-
 abstract public class KryoNetTestCase extends TestCase {
 	static public String host = "localhost";
 	static public int tcpPort = 54555, udpPort = 54777;
 
-	private ArrayList<Thread> threads = new ArrayList();
-	ArrayList<EndPoint> endPoints = new ArrayList();
+	private ArrayList<Thread> threads = new ArrayList<Thread>();
+	ArrayList<EndPoint> endPoints = new ArrayList<EndPoint>();
 	private Timer timer;
 	boolean fail;
 
-	public KryoNetTestCase () {
-		// Log.TRACE();
-		// Log.DEBUG();
-		Log.setLogger(new Logger() {
-			public void log (int level, String category, String message, Throwable ex) {
-				// if (category == null || category.equals("kryonet")) //
-				super.log(level, category, message, ex);
-			}
-		});
-	}
+	public KryoNetTestCase () {}
 
 	protected void setUp () throws Exception {
 		System.out.println("---- " + getClass().getSimpleName());
@@ -95,8 +83,8 @@ abstract public class KryoNetTestCase extends TestCase {
 		};
 		timer.schedule(failTask, 11000);
 		while (true) {
-			for (Iterator iter = threads.iterator(); iter.hasNext();) {
-				Thread thread = (Thread)iter.next();
+			for (Iterator<Thread> iter = threads.iterator(); iter.hasNext();) {
+				Thread thread = iter.next();
 				if (!thread.isAlive()) iter.remove();
 			}
 			if (threads.isEmpty()) break;

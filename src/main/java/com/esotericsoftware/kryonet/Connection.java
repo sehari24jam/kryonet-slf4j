@@ -26,10 +26,11 @@ import java.net.SocketAddress;
 import java.net.SocketException;
 import java.nio.channels.SocketChannel;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryonet.FrameworkMessage.Ping;
-
-import static com.esotericsoftware.minlog.Log.*;
 
 // BOZO - Layer to handle handshake state.
 
@@ -37,6 +38,8 @@ import static com.esotericsoftware.minlog.Log.*;
  * is closed or errors, both connections are closed.
  * @author Nathan Sweet <misc@n4te.com> */
 public class Connection {
+	private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
+	
 	int id = -1;
 	private String name;
 	EndPoint endPoint;
@@ -72,26 +75,28 @@ public class Connection {
 	 * @return The number of bytes sent.
 	 * @see Kryo#register(Class, com.esotericsoftware.kryo.Serializer) */
 	public int sendTCP (Object object) {
+		final String methodName = "sendTCP : ";
+		
 		if (object == null) throw new IllegalArgumentException("object cannot be null.");
 		try {
 			int length = tcp.send(this, object);
 			if (length == 0) {
-				if (TRACE) trace("kryonet", this + " TCP had nothing to send.");
-			} else if (DEBUG) {
+				LOGGER.trace("{}{} TCP had nothing to send.", methodName, this);
+			} else if (LOGGER.isDebugEnabled()) {
 				String objectString = object == null ? "null" : object.getClass().getSimpleName();
 				if (!(object instanceof FrameworkMessage)) {
-					debug("kryonet", this + " sent TCP: " + objectString + " (" + length + ")");
-				} else if (TRACE) {
-					trace("kryonet", this + " sent TCP: " + objectString + " (" + length + ")");
+					LOGGER.debug("{}{} sent TCP: {} ({})", methodName, this, objectString, length);
+				} else if (LOGGER.isTraceEnabled()) {
+					LOGGER.trace("{}{} sent TCP: {} ({})", methodName, this, objectString, length);
 				}
 			}
 			return length;
 		} catch (IOException ex) {
-			if (DEBUG) debug("kryonet", "Unable to send TCP with connection: " + this, ex);
+			LOGGER.error("Unable to send TCP with connection: " + this, ex);
 			close();
 			return 0;
 		} catch (KryoNetException ex) {
-			if (ERROR) error("kryonet", "Unable to send TCP with connection: " + this, ex);
+			LOGGER.error("Unable to send TCP with connection: " + this, ex);
 			close();
 			return 0;
 		}
@@ -102,6 +107,8 @@ public class Connection {
 	 * @see Kryo#register(Class, com.esotericsoftware.kryo.Serializer)
 	 * @throws IllegalStateException if this connection was not opened with both TCP and UDP. */
 	public int sendUDP (Object object) {
+		final String methodName = "sendUDP : ";
+		
 		if (object == null) throw new IllegalArgumentException("object cannot be null.");
 		SocketAddress address = udpRemoteAddress;
 		if (address == null && udp != null) address = udp.connectedAddress;
@@ -112,25 +119,25 @@ public class Connection {
 
 			int length = udp.send(this, object, address);
 			if (length == 0) {
-				if (TRACE) trace("kryonet", this + " UDP had nothing to send.");
-			} else if (DEBUG) {
+				LOGGER.trace("{}{} UDP had nothing to send.", methodName, this);
+			} else if (LOGGER.isDebugEnabled()) {
 				if (length != -1) {
 					String objectString = object == null ? "null" : object.getClass().getSimpleName();
 					if (!(object instanceof FrameworkMessage)) {
-						debug("kryonet", this + " sent UDP: " + objectString + " (" + length + ")");
-					} else if (TRACE) {
-						trace("kryonet", this + " sent UDP: " + objectString + " (" + length + ")");
+						LOGGER.debug("{}{} sent UDP: {} ({})", methodName, this, objectString, length);
+					} else if (LOGGER.isTraceEnabled()) {
+						LOGGER.trace("{}{} sent UDP: {} ({})", methodName, this, objectString, length);
 					}
 				} else
-					debug("kryonet", this + " was unable to send, UDP socket buffer full.");
+					LOGGER.debug("kryonet", this + " was unable to send, UDP socket buffer full.");
 			}
 			return length;
 		} catch (IOException ex) {
-			if (DEBUG) debug("kryonet", "Unable to send UDP with connection: " + this, ex);
+			LOGGER.error("Unable to send UDP with connection: " + this, ex);
 			close();
 			return 0;
 		} catch (KryoNetException ex) {
-			if (ERROR) error("kryonet", "Unable to send UDP with connection: " + this, ex);
+			LOGGER.error("Unable to send UDP with connection: " + this, ex);
 			close();
 			return 0;
 		}
@@ -143,7 +150,7 @@ public class Connection {
 		if (udp != null && udp.connectedAddress != null) udp.close();
 		if (wasConnected) {
 			notifyDisconnected();
-			if (INFO) info("kryonet", this + " disconnected.");
+			LOGGER.info("close : {} disconnected.", this);
 		}
 		setConnected(false);
 	}
@@ -195,7 +202,7 @@ public class Connection {
 			System.arraycopy(listeners, 0, newListeners, 1, n);
 			this.listeners = newListeners;
 		}
-		if (TRACE) trace("kryonet", "Connection listener added: " + listener.getClass().getName());
+		LOGGER.trace("addListener : Connection listener added: {}", listener.getClass().getName());
 	}
 
 	public void removeListener (Listener listener) {
@@ -213,17 +220,19 @@ public class Connection {
 			}
 			this.listeners = newListeners;
 		}
-		if (TRACE) trace("kryonet", "Connection listener removed: " + listener.getClass().getName());
+		LOGGER.trace("removeListener : Connection listener removed: {}", listener.getClass().getName());
 	}
 
 	void notifyConnected () {
-		if (INFO) {
+		if (LOGGER.isInfoEnabled()) {
 			SocketChannel socketChannel = tcp.socketChannel;
 			if (socketChannel != null) {
 				Socket socket = tcp.socketChannel.socket();
 				if (socket != null) {
 					InetSocketAddress remoteSocketAddress = (InetSocketAddress)socket.getRemoteSocketAddress();
-					if (remoteSocketAddress != null) info("kryonet", this + " connected: " + remoteSocketAddress.getAddress());
+					if (remoteSocketAddress != null) {
+						LOGGER.info("notifyConnected : {} connected: {}", this, remoteSocketAddress.getAddress());
+					}
 				}
 			}
 		}
@@ -252,7 +261,7 @@ public class Connection {
 			if (ping.isReply) {
 				if (ping.id == lastPingID - 1) {
 					returnTripTime = (int)(System.currentTimeMillis() - lastPingSendTime);
-					if (TRACE) trace("kryonet", this + " return trip time: " + returnTripTime);
+					LOGGER.trace("notifyReceived : {} return trip time: {}", this, returnTripTime);
 				}
 			} else {
 				ping.isReply = true;

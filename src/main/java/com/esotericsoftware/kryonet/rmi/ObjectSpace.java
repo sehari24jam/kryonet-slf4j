@@ -19,8 +19,6 @@
 
 package com.esotericsoftware.kryonet.rmi;
 
-import static com.esotericsoftware.minlog.Log.*;
-
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -35,6 +33,9 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.KryoException;
@@ -62,6 +63,8 @@ import com.esotericsoftware.reflectasm.MethodAccess;
  * not final (note primitives are final) then an extra byte is written for that parameter.
  * @author Nathan Sweet <misc@n4te.com> */
 public class ObjectSpace {
+	private static final Logger LOGGER = LoggerFactory.getLogger(ObjectSpace.class);
+	
 	static private final int returnValueMask = 1 << 7;
 	static private final int returnExceptionMask = 1 << 6;
 	static private final int responseIdMask = 0xff & ~returnValueMask & ~returnExceptionMask;
@@ -89,7 +92,7 @@ public class ObjectSpace {
 			final InvokeMethod invokeMethod = (InvokeMethod)object;
 			final Object target = idToObject.get(invokeMethod.objectID);
 			if (target == null) {
-				if (WARN) warn("kryonet", "Ignoring remote invocation request for unknown object ID: " + invokeMethod.objectID);
+				LOGGER.warn("received : Ignoring remote invocation request for unknown object ID: {}", invokeMethod.objectID);
 				return;
 			}
 			if (executor == null)
@@ -144,14 +147,14 @@ public class ObjectSpace {
 		if (object == null) throw new IllegalArgumentException("object cannot be null.");
 		idToObject.put(objectID, object);
 		objectToID.put(object, objectID);
-		if (TRACE) trace("kryonet", "Object registered with ObjectSpace as " + objectID + ": " + object);
+		LOGGER.trace("register : Object registered with ObjectSpace as {}:{}", objectID, object);
 	}
 
 	/** Removes an object. The remote end of the ObjectSpace's connections will no longer be able to access it. */
 	public void remove (int objectID) {
 		Object object = idToObject.remove(objectID);
 		if (object != null) objectToID.remove(object, 0);
-		if (TRACE) trace("kryonet", "Object " + objectID + " removed from ObjectSpace: " + object);
+		LOGGER.trace("remove(id) : Object {} removed from ObjectSpace: {}", objectID, object);
 	}
 
 	/** Removes an object. The remote end of the ObjectSpace's connections will no longer be able to access it. */
@@ -160,7 +163,7 @@ public class ObjectSpace {
 		int objectID = idToObject.findKey(object, true, -1);
 		idToObject.remove(objectID);
 		objectToID.remove(object, 0);
-		if (TRACE) trace("kryonet", "Object " + objectID + " removed from ObjectSpace: " + object);
+		LOGGER.trace("remove(object) : Object {} removed from ObjectSpace: {}", objectID, object);
 	}
 
 	/** Causes this ObjectSpace to stop listening to the connections for method invocation messages. */
@@ -175,7 +178,7 @@ public class ObjectSpace {
 			instances = temp.toArray(new ObjectSpace[temp.size()]);
 		}
 
-		if (TRACE) trace("kryonet", "Closed ObjectSpace.");
+		LOGGER.trace("close : Closed ObjectSpace.");
 	}
 
 	/** Allows the remote end of the specified connection to access objects registered in this ObjectSpace. */
@@ -191,7 +194,7 @@ public class ObjectSpace {
 
 		connection.addListener(invokeListener);
 
-		if (TRACE) trace("kryonet", "Added connection to ObjectSpace: " + connection);
+		LOGGER.trace("addConnection : Added connection to ObjectSpace: {}", connection);
 	}
 
 	/** Removes the specified connection, it will no longer be able to access objects registered in this ObjectSpace. */
@@ -206,7 +209,7 @@ public class ObjectSpace {
 			connections = temp.toArray(new Connection[temp.size()]);
 		}
 
-		if (TRACE) trace("kryonet", "Removed connection from ObjectSpace: " + connection);
+		LOGGER.trace("removeConnection : Removed connection from ObjectSpace: {}", connection);
 	}
 
 	/** Invokes the method on the object and, if necessary, sends the result back to the connection that made the invocation
@@ -214,15 +217,16 @@ public class ObjectSpace {
 	 * {@link #setExecutor(Executor) executor} has been set.
 	 * @param connection The remote side of this connection requested the invocation. */
 	protected void invoke (Connection connection, Object target, InvokeMethod invokeMethod) {
-		if (DEBUG) {
+		final String methodName = "invoke : ";
+		
+		if (LOGGER.isDebugEnabled()) {
 			String argString = "";
 			if (invokeMethod.args != null) {
 				argString = Arrays.deepToString(invokeMethod.args);
 				argString = argString.substring(1, argString.length() - 1);
 			}
-			debug("kryonet",
-				connection + " received: " + target.getClass().getSimpleName() + "#" + invokeMethod.cachedMethod.method.getName()
-					+ "(" + argString + ")");
+			LOGGER.debug("{}{} received: {}#{}({})", methodName, connection, target.getClass().getSimpleName(), 
+					invokeMethod.cachedMethod.method.getName(),	argString);
 		}
 
 		byte responseData = invokeMethod.responseData;
@@ -259,7 +263,7 @@ public class ObjectSpace {
 		}
 
 		int length = connection.sendTCP(invokeMethodResult);
-		if (DEBUG) debug("kryonet", connection + " sent TCP: " + result + " (" + length + ")");
+		LOGGER.debug("{}{} sent TCP: {}({})", methodName, connection, result, length);
 	}
 
 	/** Identical to {@link #getRemoteObject(Connection, int, Class...)} except returns the object cast to the specified interface
@@ -344,6 +348,8 @@ public class ObjectSpace {
 		}
 
 		public Object invoke (Object proxy, Method method, Object[] args) throws Exception {
+			final String methodName = "RemoteInvocationHandler.invoke : ";
+			
 			Class declaringClass = method.getDeclaringClass();
 			if (declaringClass == RemoteObject.class) {
 				String name = method.getName();
@@ -419,14 +425,14 @@ public class ObjectSpace {
 				invokeMethod.responseData = 0; // A response data of 0 means to not respond.
 			}
 			int length = udp ? connection.sendUDP(invokeMethod) : connection.sendTCP(invokeMethod);
-			if (DEBUG) {
+			if (LOGGER.isDebugEnabled()) {
 				String argString = "";
 				if (args != null) {
 					argString = Arrays.deepToString(args);
 					argString = argString.substring(1, argString.length() - 1);
 				}
-				debug("kryonet", connection + " sent " + (udp ? "UDP" : "TCP") + ": " + method.getDeclaringClass().getSimpleName()
-					+ "#" + method.getName() + "(" + argString + ") (" + length + ")");
+				LOGGER.debug(connection + "{}{} sent {}:{}#{}({})({})",methodName, connection, (udp ? "UDP" : "TCP"), method.getDeclaringClass().getSimpleName(),
+					method.getName(), argString, length);
 			}
 
 			lastResponseID = (byte)(invokeMethod.responseData & responseIdMask);
@@ -701,7 +707,9 @@ public class ObjectSpace {
 				int objectID = input.readInt(true);
 				Connection connection = (Connection)kryo.getContext().get("connection");
 				Object object = getRegisteredObject(connection, objectID);
-				if (WARN && object == null) warn("kryonet", "Unknown object ID " + objectID + " for connection: " + connection);
+				if (object == null) {
+					LOGGER.warn("registerClasses : Unknown object ID {} for connection: {}", objectID, connection);
+				}
 				return object;
 			}
 		});

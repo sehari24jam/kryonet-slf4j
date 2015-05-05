@@ -28,10 +28,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static com.esotericsoftware.minlog.Log.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Used to be notified about connection events. */
 public class Listener {
+	private static final Logger LOGGER = LoggerFactory.getLogger(Listener.class);
+	
 	/** Called when the remote end has been connected. This will be invoked before any objects are received by
 	 * {@link #received(Connection, Object)}. This will be invoked on the same thread as {@link Client#update(int)} and
 	 * {@link Server#update(int)}. This method should not block for long periods as other network activity will not be processed
@@ -59,6 +62,8 @@ public class Listener {
 		private final HashMap<Class, Method> classToMethod = new HashMap();
 
 		public void received (Connection connection, Object object) {
+			final String methodName = "received : ";
+			
 			Class type = object.getClass();
 			Method method = classToMethod.get(type);
 			if (method == null) {
@@ -66,12 +71,10 @@ public class Listener {
 				try {
 					method = getClass().getMethod("received", new Class[] {Connection.class, type});
 				} catch (SecurityException ex) {
-					if (ERROR) error("kryonet", "Unable to access method: received(Connection, " + type.getName() + ")", ex);
+					LOGGER.error("Unable to access method: received(Connection, " + type.getName() + ")", ex);
 					return;
 				} catch (NoSuchMethodException ex) {
-					if (DEBUG)
-						debug("kryonet",
-							"Unable to find listener method: " + getClass().getName() + "#received(Connection, " + type.getName() + ")");
+					LOGGER.debug("{} Unable to find listener method: {}#received(Connection, {})", methodName, getClass().getName(), type.getName());
 					return;
 				} finally {
 					classToMethod.put(type, method);
