@@ -7,14 +7,17 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>net.lizalab</groupId>
+    <groupId>id.sehari24jam</groupId>
     <artifactId>kryonet-slf4j</artifactId>
     <version>2.22.1-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>KryoNet-slf4j</name>
-    <description>Fork of Esoteric Software's KryoNet built by Nathan Sweet that replaces Minlog with slf4j as the logging facade and removes hard dependency on jsonbeans.</description>
-    <url>https://github.com/hpadmanabhan/kryonet-slf4j</url>
+    <description>
+	    Fork of Esoteric Software's KryoNet built by Nathan Sweet that replaces Minlog with slf4j as the logging facade and removes hard dependency on jsonbeans.
+	    Fork from https://github.com/hpadmanabhan/kryonet-slf4j.
+    </description>
+    <url>https://github.com/sehari24jam/kryonet-slf4j</url>
 
     <licenses>
         <license>
@@ -26,15 +29,15 @@
 
     <developers>
         <developer>
-            <name>Hemant Padmanabhan</name>
-            <email>padmanabhanhemant at gmail dot com</email>
+            <name>Sehari24Jam</name>
+            <email>sehari24jam at gmail dot com</email>
         </developer>
     </developers>
 
     <scm>
-        <url>https://github.com/hpadmanabhan/kryonet-slf4j</url>
-        <connection>scm:git:git@github.com:hpadmanabhan/kryonet-slf4j.git</connection>
-		<developerConnection>scm:git:git@github.com:hpadmanabhan/kryonet-slf4j.git</developerConnection>
+        <url>https://github.com/sehari24jam/kryonet-slf4j</url>
+        <connection>scm:git:git@github.com:sehari24jam/kryonet-slf4j.git</connection>
+		<developerConnection>scm:git:git@github.com:sehari24jam/kryonet-slf4j.git</developerConnection>
         <tag>HEAD</tag>
     </scm>
 
